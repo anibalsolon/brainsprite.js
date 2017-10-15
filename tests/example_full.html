@@ -2,7 +2,7 @@
 <html>
 <head>
   <style>
-    
+
     html, body {
       margin: 0; padding: 0;
     }
@@ -79,13 +79,13 @@
   brainOverlay.addEventListener('change', function(e) {
     var el = document.getElementById("text");
     el.innerHTML =
-      "Slice coordinates" + 
+      "Slice coordinates" +
       ": x: " + e.X +
       ", y: " + e.Y +
       ", z: " + e.Z +
       ", v: " + (e.cm.value || "undef");
   });
-  
+
   window.addEventListener('resize', function(){
     brainOverlay.resize();
   }, false);
