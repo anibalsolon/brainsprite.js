@@ -76,19 +76,54 @@ brainsprite.modules.cross = function(brain, params) {
   this.ready = true;
   this.brain.init();
 
-  this.drawCrossAt = function(context, center) {
-    brain.context.strokeStyle = this.params.color;
+  this.drawCrossAt = function(bbox) {
+    var context = this.brain.context;
+    var s = this.brain.slice;
+    var p = bbox.pixel(s);
+
+    p.x--;
+    p.y--;
+
+    context.strokeStyle = this.params.color;
+    context.lineCap = 'butt';
+    context.lineJoin = 'miter';
+    context.lineWidth = this.params.width;
+    var hlw = this.params.width / 2;
+
+    if (p.x + hlw > bbox.x + bbox.width) {
+      p.x -= Math.ceil(hlw);
+    } else if (p.x - hlw <= bbox.x) {
+      p.x += Math.floor(hlw);
+    }
+
+    if (p.y + hlw > bbox.y + bbox.height) {
+      p.y -= Math.ceil(hlw);
+    } else if (p.y - hlw <= bbox.y) {
+      p.y += Math.floor(hlw);
+    }
+
+    var dirty = {
+      x: Math.max(bbox.x, p.x - this.params.radius),
+      y: Math.max(bbox.y, p.y - this.params.radius),
+      w: Math.min(bbox.x + bbox.width - 1, p.x + this.params.radius),
+      h: Math.min(bbox.y + bbox.height - 1, p.y + this.params.radius),
+    }
+
+    context.beginPath();
+    context.moveTo(p.x, dirty.y);
+    context.lineTo(p.x, dirty.h);
+    context.stroke();
+    context.closePath();
+
     context.lineWidth = this.params.width;
 
     context.beginPath();
-
-    context.moveTo(center.x, center.y - this.params.radius);
-    context.lineTo(center.x, center.y + this.params.radius);
+    context.moveTo(dirty.x, p.y);
+    context.lineTo(dirty.w, p.y);
     context.stroke();
+    context.closePath();
 
-    context.moveTo(center.x - this.params.radius, center.y);
-    context.lineTo(center.x + this.params.radius, center.y);
-    context.stroke();
+    return dirty
   }
 
   this.dirty = function () {
@@ -96,8 +131,8 @@ brainsprite.modules.cross = function(brain, params) {
   }
 
   this.draw = function (dirty) {
-    dirty.X && this.drawCrossAt(this.brain.context, this.brain.center.X())
-    dirty.Y && this.drawCrossAt(this.brain.context, this.brain.center.Y())
-    dirty.Z && this.drawCrossAt(this.brain.context, this.brain.center.Z())
+    dirty.X && this.drawCrossAt(this.brain.bbox.X());
+    dirty.Y && this.drawCrossAt(this.brain.bbox.Y());
+    dirty.Z && this.drawCrossAt(this.brain.bbox.Z());
   }
-}
+};
