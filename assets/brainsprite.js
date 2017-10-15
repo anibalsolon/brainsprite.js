@@ -53,53 +53,6 @@ function brainsprite(params) {
     }
   }
 
-  brain.getAnchor = function() {
-    return brain.layers[brain.anchor];
-  }
-
-  brain.resize = function() {
-    var slices = brain.getAnchor().slices;
-
-    // Update the width of the X, Y and Z slices in the canvas, based on the width of its parent
-    var width = brain.width = {
-      X: Math.floor(brain.canvas.offsetWidth * (slices.Y / (2 * slices.X + slices.Y))),
-      Y: Math.floor(brain.canvas.offsetWidth * (slices.X / (2 * slices.X + slices.Y))),
-      Z: Math.floor(brain.canvas.offsetWidth * (slices.X / (2 * slices.X + slices.Y))),
-      offset: 0,
-    }
-    width.total = width.X + width.Y + width.Z;
-
-    // Update the height of the slices in the canvas, based on width and image ratio
-    var height = brain.height = {
-      X: Math.floor(width.X * slices.Z / slices.Y),
-      Y: Math.floor(width.Y * slices.Z / slices.X),
-      Z: Math.floor(width.Z * slices.Y / slices.X),
-      offset: 0,
-    }
-    height.center = brain.canvas.offsetHeight / 2;
-    height.total = height.X + height.Y + height.Z;
-
-    // Resize axis if height does not match with canvas
-    var max = Math.max(height.X, height.Y, height.Z);
-    if (brain.canvas.offsetHeight < max) {
-      var ratio = brain.canvas.offsetHeight / max;
-      width.X = Math.floor(width.X * ratio);
-      width.Y = Math.floor(width.Y * ratio);
-      width.Z = Math.floor(width.Z * ratio);
-      height.X = Math.floor(height.X * ratio);
-      height.Y = Math.floor(height.Y * ratio);
-      height.Z = Math.floor(height.Z * ratio);
-      width.offset = Math.floor(brain.canvas.offsetWidth / 2 - width.total / 2);
-      height.offset = 0;
-    }
-
-    brain.canvas.width = brain.canvas.offsetWidth;
-    brain.canvas.height = brain.canvas.offsetHeight;
-
-    brain.dirty = { X: true, Y: true, Z: true };
-    brain.drawAll();
-  }
-
   brain.init = function() {
 
     // Wait to load every image
@@ -127,7 +80,7 @@ function brainsprite(params) {
     // Number of slices
     anchor.slices.X = anchor.nbCol * anchor.nbRow;
 
-    // width and height for the canvas
+    // Width and height for the canvas
     brain.width = { X: 0, Y: 0, Z: 0, total: 0, offset: 0 };
     brain.height = { X: 0, Y: 0, Z: 0, center: 0, offset: 0 };
 
@@ -215,7 +168,6 @@ function brainsprite(params) {
       var pos = {};
       for (var zz = 0; zz < anchor.slices.Z; zz++) {
         for (var xx = 0; xx < anchor.slices.X; xx++) {
-
           pos.XW = xx % anchor.nbCol;
           pos.XH = (xx - pos.XW) / anchor.nbCol;
           pos.ZH = zz % anchor.nbCol;
@@ -232,58 +184,134 @@ function brainsprite(params) {
 
     brain.resize();
     brain.moveTo(brain.slice);
+
+    brain.triggerEvent('init', {});
+  };
+
+  brain.getAnchor = function() {
+    return brain.layers[brain.anchor];
+  };
+
+  brain.resize = function() {
+    var slices = brain.getAnchor().slices;
+
+    brain.canvas.width = brain.canvas.offsetWidth;
+    brain.canvas.height = brain.canvas.offsetHeight;
+
+    // Update the width of the X, Y and Z slices in the canvas, based on the width of its parent
+    var width = brain.width = {
+      X: Math.floor(brain.canvas.offsetWidth * (slices.Y / (2 * slices.X + slices.Y))),
+      Y: Math.floor(brain.canvas.offsetWidth * (slices.X / (2 * slices.X + slices.Y))),
+      Z: Math.floor(brain.canvas.offsetWidth * (slices.X / (2 * slices.X + slices.Y))),
+      offset: 0,
+    }
+    width.total = width.X + width.Y + width.Z;
+
+    // Update the height of the slices in the canvas, based on width and image ratio
+    var height = brain.height = {
+      X: Math.floor(width.X * slices.Z / slices.Y),
+      Y: Math.floor(width.Y * slices.Z / slices.X),
+      Z: Math.floor(width.Z * slices.Y / slices.X),
+      offset: 0,
+    }
+
+    height.center = brain.canvas.offsetHeight / 2;
+    height.total = height.X + height.Y + height.Z;
+    height.max = Math.max(height.X, height.Y, height.Z);
+
+    // Resize axis if height does not match with canvas
+    if (brain.canvas.offsetHeight < height.max) {
+      var ratio = brain.canvas.offsetHeight / height.max;
+      width.X = Math.floor(width.X * ratio);
+      width.Y = Math.floor(width.Y * ratio);
+      width.Z = Math.floor(width.Z * ratio);
+      width.total = width.X + width.Y + width.Z;
+      height.X = Math.floor(height.X * ratio);
+      height.Y = Math.floor(height.Y * ratio);
+      height.Z = Math.floor(height.Z * ratio);
+      width.offset = Math.floor(brain.canvas.offsetWidth / 2 - width.total / 2);
+      height.offset = 0;
+    }
+
+    brain.dirty = { X: true, Y: true, Z: true };
+    brain.drawAll();
+  };
+
+  var _into = function(p) {
+    return (
+      p.x >= this.x && p.x < this.x + this.width &&
+      p.y >= this.y && p.y < this.y + this.height
+    );
   };
 
   brain.bbox = {
     X: function(){
       return {
-        x: 0,
-        y: brain.height.center - brain.height.X / 2,
+        x: brain.width.offset + 0,
+        y: Math.floor(brain.height.center - brain.height.X / 2),
         width: brain.width.X,
         height: brain.height.X,
+        into: _into,
+        slice: function(p) {
+          var slices = brain.getAnchor().slices;
+          return {
+            Y: Math.round(slices.Y * (p.x - this.x) / this.width),
+            Z: Math.round(slices.Z * (p.y - this.y) / this.height),
+          }
+        },
+        pixel: function(s) {
+          var slices = brain.getAnchor().slices;
+          return {
+            x: this.x + Math.round(s.Y * this.width / slices.Y),
+            y: this.y + Math.round(s.Z * this.height / slices.Z),
+          }
+        },
       }
     },
     Y: function(){
       return {
-        x: brain.width.X,
-        y: brain.height.center - brain.height.Y / 2,
+        x: brain.width.offset + brain.width.X,
+        y: Math.floor(brain.height.center - brain.height.Y / 2),
         width: brain.width.Y,
         height: brain.height.Y,
+        into: _into,
+        slice: function(p) {
+          var slices = brain.getAnchor().slices;
+          return {
+            X: Math.round(slices.X * (p.x - this.x) / this.width),
+            Z: Math.round(slices.Z * (p.y - this.y) / this.height),
+          }
+        },
+        pixel: function(s) {
+          var slices = brain.getAnchor().slices;
+          return {
+            x: this.x + Math.round(s.X * this.width / slices.X),
+            y: this.y + Math.round(s.Z * this.height / slices.Z),
+          }
+        },
       }
     },
     Z: function(){
       return {
-        x: brain.width.X + brain.width.Y,
-        y: brain.height.center - brain.height.Z / 2,
+        x: brain.width.offset + brain.width.X + brain.width.Y,
+        y: Math.floor(brain.height.center - brain.height.Z / 2),
         width: brain.width.Z,
         height: brain.height.Z,
-      }
-    },
-  };
-
-  brain.center = {
-    X: function(){
-      var slices = brain.getAnchor().slices;
-      var bbox = brain.bbox.X();
-      return {
-        x: bbox.x + Math.round(brain.slice.Y * brain.width.X / slices.Y),
-        y: bbox.y + Math.round(brain.slice.Z * brain.height.X / slices.Z),
-      }
-    },
-    Y: function(){
-      var slices = brain.getAnchor().slices;
-      var bbox = brain.bbox.Y();
-      return {
-        x: bbox.x + Math.round(brain.slice.X * brain.width.Y / slices.X),
-        y: bbox.y + Math.round(brain.slice.Z * brain.height.Y / slices.Z),
-      }
-    },
-    Z: function(){
-      var slices = brain.getAnchor().slices;
-      var bbox = brain.bbox.Z();
-      return {
-        x: bbox.x + Math.round(brain.slice.X * brain.width.Z / slices.X),
-        y: bbox.y - ((brain.slice.Y - slices.Y) * brain.height.Z / slices.Y),
+        into: _into,
+        slice: function(p) {
+          var slices = brain.getAnchor().slices;
+          return {
+            X: Math.round(slices.X * (p.x - this.x) / this.width),
+            Y: Math.round(slices.Y * (1 - (p.y - this.y) / this.height)),
+          }
+        },
+        pixel: function(s) {
+          var slices = brain.getAnchor().slices;
+          return {
+            x: this.x + Math.round(s.X * this.width / slices.X),
+            y: this.y - Math.round((s.Y - slices.Y) * this.height / slices.Y),
+          }
+        },
       }
     },
   };
@@ -296,7 +324,7 @@ function brainsprite(params) {
     } else {
       throw Error("Invalid layer index");
     }
-  }
+  };
 
   brain.draw = function() {
     if (!brain.dirty.X && !brain.dirty.Y && !brain.dirty.Z)
@@ -311,11 +339,21 @@ function brainsprite(params) {
     pos.ZW = brain.slice.Z % anchor.nbCol;
     pos.ZH = (brain.slice.Z - pos.ZW) / anchor.nbCol;
 
-    // Set fill color for the axis
+    var bbox = {
+      X: brain.bbox.X(),
+      Y: brain.bbox.Y(),
+      Z: brain.bbox.Z(),
+    };
+
     brain.context.fillStyle = brain.background;
-    brain.dirty.X && brain.context.fillRect(0, 0, brain.width.X, brain.canvas.height);
-    brain.dirty.Y && brain.context.fillRect(brain.width.X, 0, brain.width.Y, brain.canvas.height);
-    brain.dirty.Z && brain.context.fillRect(brain.width.X + brain.width.Y, 0, brain.width.Z, brain.canvas.height);
+    if (brain.dirty.X && brain.dirty.Y && brain.dirty.Z)
+      brain.context.fillRect(0, 0, brain.canvas.width, brain.canvas.height);
+    else {
+      // Set fill color for the axis
+      brain.dirty.X && brain.context.fillRect(bbox.X.x, bbox.X.y, bbox.X.width, bbox.X.height);
+      brain.dirty.Y && brain.context.fillRect(bbox.Y.x, bbox.Y.y, bbox.Y.width, bbox.Y.height);
+      brain.dirty.Z && brain.context.fillRect(bbox.Z.x, bbox.Z.y, bbox.Z.width, bbox.Z.height);
+    }
 
     for (var i in brain.layers) {
       var layer = brain.layers[i];
@@ -326,41 +364,47 @@ function brainsprite(params) {
         continue;
       }
 
-      brain.dirty.X && brain.context.drawImage(
-        layer.planes.X.canvas,
-        pos.XW * anchor.slices.Y,
-        pos.XH * anchor.slices.Z,
-        anchor.slices.Y,
-        anchor.slices.Z,
-        0,
-        brain.height.center - brain.height.X / 2,
-        brain.width.X,
-        brain.height.X
-      );
+      if (brain.dirty.X) {
+        brain.context.drawImage(
+          layer.planes.X.canvas,
+          pos.XW * anchor.slices.Y,
+          pos.XH * anchor.slices.Z,
+          anchor.slices.Y,
+          anchor.slices.Z,
+          bbox.X.x,
+          bbox.X.y,
+          bbox.X.width,
+          bbox.X.height
+        );
+      }
 
-      brain.dirty.Y && brain.context.drawImage(
-        layer.planes.Y.canvas,
-        pos.YW * anchor.slices.X,
-        pos.YH * anchor.slices.Z,
-        anchor.slices.X,
-        anchor.slices.Z,
-        brain.width.X,
-        brain.height.center - brain.height.Y / 2,
-        brain.width.Y,
-        brain.height.Y
-      );
+      if (brain.dirty.Y) {
+        brain.context.drawImage(
+          layer.planes.Y.canvas,
+          pos.YW * anchor.slices.X,
+          pos.YH * anchor.slices.Z,
+          anchor.slices.X,
+          anchor.slices.Z,
+          bbox.Y.x,
+          bbox.Y.y,
+          bbox.Y.width,
+          bbox.Y.height
+        );
+      }
 
-      brain.dirty.Z && brain.context.drawImage(
-        layer.planes.Z.canvas,
-        pos.ZW * anchor.slices.X,
-        pos.ZH * anchor.slices.Y,
-        anchor.slices.X,
-        anchor.slices.Y,
-        brain.width.X + brain.width.Y,
-        brain.height.center - brain.height.Z / 2,
-        brain.width.Z,
-        brain.height.Z
-      );
+      if (brain.dirty.Z) {
+        brain.context.drawImage(
+          layer.planes.Z.canvas,
+          pos.ZW * anchor.slices.X,
+          pos.ZH * anchor.slices.Y,
+          anchor.slices.X,
+          anchor.slices.Y,
+          bbox.Z.x,
+          bbox.Z.y,
+          bbox.Z.width,
+          bbox.Z.height
+        );
+      }
     }
 
     brain.dirty.X = brain.dirty.Y = brain.dirty.Z = false;
@@ -397,70 +441,71 @@ function brainsprite(params) {
 
     brain.triggerEvent('change', Object.assign({}, coords));
     brain.draw();
-  }
+  };
 
-  brain.eventListeners = { change: [] };
+  brain.eventListeners = { init: [], change: [] };
   brain.addEventListener = function(type, listener) {
-    if (type != 'change') return;
-    brain.eventListeners.change.push({type: type, listener: listener});
+    if (['init', 'change'].indexOf(type) < 0) return;
+    brain.eventListeners[type].push({ listener: listener });
   };
 
   brain.removeEventListener = function(type, listener) {
     var i = 0;
-    while (i < brain.eventListeners.length) {
-      var eventListener = brain.eventListeners[i];
-      if (eventListener.type == type && eventListener.listener == listener) {
-        brain.eventListeners.splice(i, 1);
+    while (i < brain.eventListeners[type].length) {
+      var eventListener = brain.eventListeners[type][i];
+      if (eventListener.listener == listener) {
+        brain.eventListeners[type].splice(i, 1);
         break;
       }
       ++i;
     }
   };
 
-  brain.triggerEvent = function(type, coords) {
-    coords = Object.assign({}, coords);
+  brain.triggerEvent = function(type, payload) {
+    payload = Object.assign({}, payload);
 
     for (var m in brain.modules) {
       var ins = brain.modules[m].instance;
       if (ins.inject)
-        coords[m] = ins.inject(type, Object.assign({}, coords));
+        payload[m] = ins.inject(type, Object.assign({}, payload));
     }
 
     // Strip out functions & clone
-    var payload = JSON.parse(JSON.stringify(coords));
+    payload = JSON.parse(JSON.stringify(payload));
 
     var i = 0;
     while (i < brain.eventListeners[type].length) {
       var eventListener = brain.eventListeners[type][i++];
       eventListener.listener.call(brain, payload);
     }
-  }
+  };
 
   brain._canvasClick = function(e) {
     var rect = brain.canvas.getBoundingClientRect();
     var xx = e.clientX - rect.left;
-    var yy = e.clientY - rect.top - brain.height.center;
+    var yy = e.clientY - rect.top;
+    var p = { x: xx, y: yy };
     var sx, sy, sz;
 
     var slices = brain.getAnchor().slices;
-    if (xx < brain.width.X) {
-      yy += brain.height.X / 2;
-      sy = Math.round(slices.Y * xx / brain.width.X);
-      sz = Math.round(slices.Z * yy / brain.height.X);
-      brain.moveTo({ Y: sy, Z: sz });
-    } else if (xx < (brain.width.X + brain.width.Y)) {
-      xx = xx - brain.width.X;
-      yy += brain.height.Y / 2;
-      sx = Math.round(slices.X * xx / brain.width.Y);
-      sz = Math.round(slices.Z * yy / brain.height.Y);
-      brain.moveTo({ X: sx, Z: sz });
-    } else {
-      xx = xx - brain.width.X - brain.width.Y;
-      yy += brain.height.Z / 2;
-      sx = Math.round(slices.X * xx / brain.width.Z);
-      sy = Math.round(slices.Y * (1 - yy / brain.height.Z));
-      brain.moveTo({ X: sx, Y: sy });
-    };
+
+    var bbox = brain.bbox.X();
+    if (bbox.into(p)) {
+      brain.moveTo(bbox.slice({ x: xx, y: yy }, slices));
+      return;
+    }
+
+    var bbox = brain.bbox.Y();
+    if (bbox.into(p)) {
+      brain.moveTo(bbox.slice({ x: xx, y: yy }, slices));
+      return;
+    }
+
+    var bbox = brain.bbox.Z();
+    if (bbox.into(p)) {
+      brain.moveTo(bbox.slice({ x: xx, y: yy }, slices));
+      return;
+    }
   };
 
   brain.drawAll = function() {
